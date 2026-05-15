@@ -1,0 +1,40 @@
+2026-05-15 21:44:37 | INFO | [ORCHESTRATOR] Step 1: block_ip/Block IP address -> ok
+2026-05-15 21:44:37 | INFO | [ORCHESTRATOR] Step 2: quarantine_device/Quarantine device -> ok
+2026-05-15 21:44:37 | INFO | [ORCHESTRATOR] Step 3: write_firewall_rule/Write firewall rule -> ok
+2026-05-15 21:44:37 | INFO | [ORCHESTRATOR] Step 4: send_alert/Send alert -> ok
+2026-05-15 21:44:37 | INFO | [ORCHESTRATOR] Step 5: scan_network/Scan network -> ok
+2026-05-15 21:56:48 | HIGH | [RESPONSE] Blocked attacker IP: 198.51.100.23
+2026-05-15 21:56:48 | INFO | [ORCHESTRATOR] Step 1: Firewall/block_ip -> ok
+2026-05-15 21:56:48 | INFO | [ORCHESTRATOR] Step 2: Deception/deploy_honeypot -> ok
+2026-05-15 22:05:18 | HIGH | [RESPONSE] Blocked attacker IP: 203.0.113.42
+2026-05-15 22:05:18 | INFO | [ORCHESTRATOR] Step 1: firewall/block_ip -> ok
+2026-05-15 22:05:19 | HIGH | [RESPONSE] Quarantined device 192.168.1.14: potential compromise
+2026-05-15 22:05:19 | INFO | [ORCHESTRATOR] Step 2: quarantine/quarantine_device -> ok
+2026-05-15 22:05:20 | INFO | [ORCHESTRATOR] Step 3: honeypot/deploy_honeypot -> ok
+2026-05-15 22:05:21 | INFO | [ORCHESTRATOR] Step 4: alert/send_alert -> ok
+2026-05-15 22:06:44 | HIGH | [RESPONSE] Blocked attacker IP: 198.51.100.23
+2026-05-15 22:06:44 | INFO | [ORCHESTRATOR] Step 1: firewall/block_ip -> ok
+2026-05-15 22:06:45 | INFO | [ORCHESTRATOR] Step 2: honeypot/deploy_honeypot -> ok
+2026-05-15 22:06:45 | HIGH | [RESPONSE] Quarantined device 192.168.1.10: Potential vulnerability
+2026-05-15 22:06:46 | INFO | [ORCHESTRATOR] Step 3: quarantine/quarantine_device -> ok
+2026-05-15 22:06:47 | INFO | [ORCHESTRATOR] Step 4: alert/send_alert -> ok
+2026-05-15 22:07:20 | HIGH | [RESPONSE] Blocked attacker IP: 192.0.2.100
+2026-05-15 22:07:21 | INFO | [ORCHESTRATOR] Step 1: firewall/block_ip -> ok
+2026-05-15 22:07:21 | HIGH | [RESPONSE] Quarantined device 192.168.1.14: potential compromise
+2026-05-15 22:07:22 | INFO | [ORCHESTRATOR] Step 2: quarantine/quarantine_device -> ok
+2026-05-15 22:07:23 | INFO | [ORCHESTRATOR] Step 3: honeypot/deploy_honeypot -> ok
+2026-05-15 22:07:23 | INFO | [ORCHESTRATOR] Step 4: alert/send_alert -> ok
+2026-05-15 22:08:06 | HIGH | [RESPONSE] Blocked attacker IP: 192.168.1.99
+2026-05-15 22:08:07 | INFO | [ORCHESTRATOR] Step 1: firewall/block_ip -> ok
+2026-05-15 22:08:07 | HIGH | [RESPONSE] Quarantined device 192.168.1.21: Compromised device
+2026-05-15 22:08:08 | INFO | [ORCHESTRATOR] Step 2: quarantine/quarantine_device -> ok
+2026-05-15 22:08:09 | INFO | [ORCHESTRATOR] Step 3: honeypot/deploy_honeypot -> ok
+2026-05-15 22:08:10 | INFO | [ORCHESTRATOR] Step 4: alert/send_alert -> ok
+2026-05-15 22:18:21 | HIGH | [RESPONSE] Blocked attacker IP: 198.51.100.23
+2026-05-15 22:18:21 | INFO | [ORCHESTRATOR] Step 1: firewall/block_ip -> ok
+2026-05-15 22:18:21 | INFO | [ORCHESTRATOR] Step 2: honeypot/deploy_honeypot -> ok
+2026-05-15 22:18:21 | HIGH | [RESPONSE] Quarantined device 192.168.1.10: Potential vulnerability
+2026-05-15 22:18:21 | INFO | [ORCHESTRATOR] Step 3: quarantine/quarantine_device -> ok
+2026-05-15 22:18:21 | INFO | [ORCHESTRATOR] Step 4: alert/send_alert -> ok
+2026-05-15 22:35:43 | INFO | [ORCHESTRATOR] Step 3: Network Scanner/scan_network -> ok
+2026-05-15 22:35:43 | INFO | [ORCHESTRATOR] Step 4: Alert System/send_alert -> ok

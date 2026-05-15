@@ -1,0 +1,102 @@
+.live-traffic-section {
+  padding-bottom: 2rem;
+}
+
+.traffic-monitor {
+  margin-top: 2rem;
+  overflow: hidden;
+  border: 1px solid rgba(0, 245, 255, 0.1);
+}
+
+.monitor-header {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1.5fr 1fr 1fr 1fr;
+  padding: 1rem 1.5rem;
+  background: rgba(0, 245, 255, 0.05);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+}
+
+.packet-list {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.packet-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1.5fr 1fr 1fr 1fr;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 0.9rem;
+  align-items: center;
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.packet-row:last-child { border-bottom: none; }
+
+.packet-row.blocked {
+  background: rgba(239, 68, 68, 0.05);
+  color: var(--red);
+}
+
+.proto-tag {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--violet);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  width: fit-content;
+}
+
+.status-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.status-tag.allowed {
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+.status-tag.blocked {
+  background: var(--red-dim);
+  color: var(--red);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+.monitor-footer {
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--cyan);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+}
+
+.scan-line {
+  width: 12px;
+  height: 12px;
+  background: var(--cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--cyan);
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
