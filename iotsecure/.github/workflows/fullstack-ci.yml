@@ -27,11 +27,11 @@ jobs:
     - name: Validate file structure
       run: |
         echo "Checking project structure..."
-        [ -d "iotsecure" ] && echo "✓ iotsecure directory found"
-        [ -f "iotsecure/requirements.txt" ] && echo "✓ requirements.txt found"
-        [ -d "iotsecure/dashboard" ] && echo "✓ dashboard directory found"
-        [ -f "iotsecure/dashboard/package.json" ] && echo "✓ package.json found"
-        [ -f "iotsecure/main.py" ] && echo "✓ main.py found"
+        [ -f "requirements.txt" ] && echo "✓ requirements.txt found"
+        [ -d "dashboard" ] && echo "✓ dashboard directory found"
+        [ -f "dashboard/package.json" ] && echo "✓ package.json found"
+        [ -f "main.py" ] && echo "✓ main.py found"
+        [ -d "agents" ] && echo "✓ agents directory found"
 
   code-quality:
     runs-on: ubuntu-latest
@@ -51,13 +51,13 @@ jobs:
     
     - name: Type checking with mypy
       run: |
-        mypy iotsecure --ignore-missing-imports || true
+        mypy . --ignore-missing-imports --exclude dashboard || true
     
     - name: Code complexity analysis
       run: |
         pip install radon
-        radon cc iotsecure -a || true
-        radon mi iotsecure || true
+        radon cc . -a -x "dashboard/*" || true
+        radon mi . -x "dashboard/*" || true
 
   dependency-check:
     runs-on: ubuntu-latest
@@ -83,5 +83,5 @@ jobs:
     
     - name: Check npm dependencies
       run: |
-        cd iotsecure/dashboard
+        cd dashboard
         npm audit || true
