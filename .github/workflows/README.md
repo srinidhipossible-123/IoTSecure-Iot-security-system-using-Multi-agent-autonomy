@@ -5,7 +5,7 @@ This project uses GitHub Actions to automate testing, building, security checks,
 ## 📋 Workflows Overview
 
 ### 1. **Backend CI/CD** (`backend-ci.yml`)
-Runs on Python code changes.
+Runs on Python code changes in the `iotsecure/` directory.
 
 **What it does:**
 - Tests Python 3.10, 3.11, and 3.12
@@ -22,7 +22,7 @@ Runs on Python code changes.
 ---
 
 ### 2. **Frontend CI/CD** (`frontend-ci.yml`)
-Runs on React/Dashboard code changes in the `dashboard/` directory.
+Runs on React/Dashboard code changes in the `iotsecure/dashboard/` directory.
 
 **What it does:**
 - Tests Node 18.x and 20.x
@@ -187,8 +187,8 @@ schedule:
 
 ### Tests failing?
 - Check Python/Node versions compatibility
-- Verify dependencies in `requirements.txt` and `package.json`
-- Run locally first: `pytest .` or `npm run lint` (in `dashboard/`)
+- Verify dependencies in `iotsecure/requirements.txt` and `iotsecure/dashboard/package.json`
+- Run locally first: `pytest iotsecure/` or `npm run lint` (in `iotsecure/dashboard/`)
 
 ### Deployment issues?
 - Ensure all environment variables are set
