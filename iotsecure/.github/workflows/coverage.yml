@@ -1,0 +1,85 @@
+name: Code Quality & Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'iotsecure/**'
+      - '.github/workflows/coverage.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'iotsecure/**'
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r iotsecure/requirements.txt
+        pip install pytest pytest-cov pytest-asyncio coverage
+    
+    - name: Generate coverage report
+      run: |
+        cd iotsecure
+        pytest --cov=. --cov-report=xml --cov-report=html --cov-report=term
+      continue-on-error: true
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./iotsecure/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+    
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: py-cov-action/python-coverage-comment-action@v3
+      with:
+        GITHUB_TOKEN: ${{ github.token }}
+        MINIMUM_GREEN: 50
+        MINIMUM_ORANGE: 30
+      continue-on-error: true
+
+  sonarqube:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r iotsecure/requirements.txt pytest pytest-cov
+    
+    - name: Generate test coverage
+      run: |
+        cd iotsecure
+        pytest --cov=. --cov-report=xml
+      continue-on-error: true
+    
+    - name: SonarQube Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      continue-on-error: true

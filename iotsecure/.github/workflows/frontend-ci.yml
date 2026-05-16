@@ -1,0 +1,81 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'iotsecure/dashboard/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'iotsecure/dashboard/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: ['18.x', '20.x']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: 'iotsecure/dashboard/package-lock.json'
+    
+    - name: Install dependencies
+      run: |
+        cd iotsecure/dashboard
+        npm ci
+    
+    - name: Lint with ESLint
+      run: |
+        cd iotsecure/dashboard
+        npm run lint
+      continue-on-error: true
+    
+    - name: Build dashboard
+      run: |
+        cd iotsecure/dashboard
+        npm run build
+    
+    - name: Archive build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dashboard-build-${{ matrix.node-version }}
+        path: iotsecure/dashboard/dist
+        retention-days: 5
+
+  security-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'iotsecure/dashboard/package-lock.json'
+    
+    - name: Install dependencies
+      run: |
+        cd iotsecure/dashboard
+        npm ci
+    
+    - name: Run npm audit
+      run: |
+        cd iotsecure/dashboard
+        npm audit --audit-level=moderate || true
+    
+    - name: Check for dependency vulnerabilities
+      run: |
+        cd iotsecure/dashboard
+        npm audit --production || true
