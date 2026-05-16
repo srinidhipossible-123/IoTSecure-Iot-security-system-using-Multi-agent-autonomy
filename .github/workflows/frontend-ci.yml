@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'dashboard/**'
+      - 'iotsecure/dashboard/**'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'dashboard/**'
+      - 'iotsecure/dashboard/**'
 
 jobs:
   build:
@@ -27,29 +27,29 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: 'dashboard/package-lock.json'
+        cache-dependency-path: 'iotsecure/dashboard/package-lock.json'
     
     - name: Install dependencies
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm ci
     
     - name: Lint with ESLint
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm run lint
       continue-on-error: true
     
     - name: Build dashboard
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm run build
     
     - name: Archive build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: dashboard-build-${{ matrix.node-version }}
-        path: dashboard/dist
+        path: iotsecure/dashboard/dist
         retention-days: 5
 
   security-check:
@@ -63,19 +63,19 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'npm'
-        cache-dependency-path: 'dashboard/package-lock.json'
+        cache-dependency-path: 'iotsecure/dashboard/package-lock.json'
     
     - name: Install dependencies
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm ci
     
     - name: Run npm audit
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm audit --audit-level=moderate || true
     
     - name: Check for dependency vulnerabilities
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm audit --production || true

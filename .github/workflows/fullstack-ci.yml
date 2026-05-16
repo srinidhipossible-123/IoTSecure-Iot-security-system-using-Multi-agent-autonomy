@@ -27,11 +27,12 @@ jobs:
     - name: Validate file structure
       run: |
         echo "Checking project structure..."
-        [ -f "requirements.txt" ] && echo "✓ requirements.txt found"
-        [ -d "dashboard" ] && echo "✓ dashboard directory found"
-        [ -f "dashboard/package.json" ] && echo "✓ package.json found"
-        [ -f "main.py" ] && echo "✓ main.py found"
-        [ -d "agents" ] && echo "✓ agents directory found"
+        [ -d "iotsecure" ] && echo "✓ iotsecure directory found"
+        [ -f "iotsecure/requirements.txt" ] && echo "✓ requirements.txt found"
+        [ -d "iotsecure/dashboard" ] && echo "✓ dashboard directory found"
+        [ -f "iotsecure/dashboard/package.json" ] && echo "✓ package.json found"
+        [ -f "iotsecure/main.py" ] && echo "✓ main.py found"
+        [ -d "iotsecure/agents" ] && echo "✓ agents directory found"
 
   code-quality:
     runs-on: ubuntu-latest
@@ -51,13 +52,13 @@ jobs:
     
     - name: Type checking with mypy
       run: |
-        mypy . --ignore-missing-imports --exclude dashboard || true
+        mypy iotsecure --ignore-missing-imports --exclude iotsecure/dashboard || true
     
     - name: Code complexity analysis
       run: |
         pip install radon
-        radon cc . -a -x "dashboard/*" || true
-        radon mi . -x "dashboard/*" || true
+        radon cc iotsecure -a -x "iotsecure/dashboard/*" || true
+        radon mi iotsecure -x "iotsecure/dashboard/*" || true
 
   dependency-check:
     runs-on: ubuntu-latest
@@ -74,7 +75,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pip-audit
-        pip-audit --desc || true
+        pip-audit --desc iotsecure/requirements.txt || true
     
     - name: Use Node.js
       uses: actions/setup-node@v4
@@ -83,5 +84,5 @@ jobs:
     
     - name: Check npm dependencies
       run: |
-        cd dashboard
+        cd iotsecure/dashboard
         npm audit || true

@@ -4,28 +4,28 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'agents/**'
-      - 'honeypot/**'
-      - 'orchestrator/**'
-      - 'security/**'
-      - 'store/**'
-      - 'tools/**'
-      - 'webhook/**'
-      - '*.py'
-      - 'requirements.txt'
+      - 'iotsecure/agents/**'
+      - 'iotsecure/honeypot/**'
+      - 'iotsecure/orchestrator/**'
+      - 'iotsecure/security/**'
+      - 'iotsecure/store/**'
+      - 'iotsecure/tools/**'
+      - 'iotsecure/webhook/**'
+      - 'iotsecure/*.py'
+      - 'iotsecure/requirements.txt'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'agents/**'
-      - 'honeypot/**'
-      - 'orchestrator/**'
-      - 'security/**'
-      - 'store/**'
-      - 'tools/**'
-      - 'webhook/**'
-      - '*.py'
-      - 'requirements.txt'
+      - 'iotsecure/agents/**'
+      - 'iotsecure/honeypot/**'
+      - 'iotsecure/orchestrator/**'
+      - 'iotsecure/security/**'
+      - 'iotsecure/store/**'
+      - 'iotsecure/tools/**'
+      - 'iotsecure/webhook/**'
+      - 'iotsecure/*.py'
+      - 'iotsecure/requirements.txt'
 
 jobs:
   test:
@@ -43,37 +43,39 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
+        cache-dependency-path: 'iotsecure/requirements.txt'
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r iotsecure/requirements.txt
         pip install pytest pytest-cov pytest-asyncio black flake8 isort
     
     - name: Lint with flake8
       run: |
         # Stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=dashboard
+        flake8 iotsecure --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=dashboard
         # Exit-zero treats all errors as warnings
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=dashboard
+        flake8 iotsecure --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=dashboard
     
     - name: Format check with black
       run: |
-        black --check . --exclude=dashboard --diff || true
+        black --check iotsecure --exclude=dashboard --diff || true
     
     - name: Import sorting check with isort
       run: |
-        isort --check-only . --skip-glob=dashboard/* --diff || true
+        isort --check-only iotsecure --skip-glob=dashboard/* --diff || true
     
     - name: Run tests
       run: |
+        cd iotsecure
         pytest . --cov=. --cov-report=xml --cov-report=term-missing
       continue-on-error: true
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
-        file: ./coverage.xml
+        file: ./iotsecure/coverage.xml
         flags: unittests
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
@@ -97,8 +99,8 @@ jobs:
     
     - name: Run Bandit security scan
       run: |
-        bandit -r . -x ./dashboard -f json -o bandit-report.json || true
+        bandit -r iotsecure -x ./iotsecure/dashboard -f json -o bandit-report.json || true
     
     - name: Check for vulnerable dependencies
       run: |
-        safety check --requirements requirements.txt || true
+        safety check --requirements iotsecure/requirements.txt || true
