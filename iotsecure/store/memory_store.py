@@ -2,8 +2,11 @@
 # NO DATABASE — thread-safe in-memory store. Fast, zero-setup, perfect for hackathon.
 import threading
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import deque
+
+from store import json_audit
+
 
 class MemoryStore:
     """Thread-safe in-memory store for all agent state."""
@@ -20,6 +23,17 @@ class MemoryStore:
         self.active_honeypots: List[dict] = []
         self._subscribers: List = []                 # WebSocket broadcast
 
+    def reset(self):
+        with self._lock:
+            self.devices.clear()
+            self.threats.clear()
+            self.honeypot_hits.clear()
+            self.blocked_ips.clear()
+            self.system_log.clear()
+            self.dashboard_events.clear()
+        self._broadcast("system_reset", {"status": "cleared"})
+        self.log("[SYSTEM] Memory store hard reset by user request.")
+
     def upsert_device(self, device: dict):
         with self._lock:
             ip = device["ip"]
@@ -31,18 +45,21 @@ class MemoryStore:
     def add_threat(self, threat: dict):
         with self._lock:
             self.threats.appendleft(threat)
+        json_audit.append_stream("events_threats", {"kind": "threat_added", **threat})
         self._broadcast("threat_event", threat)
         self.log(f"[THREAT] {threat['severity'].upper()} — {threat['threat_type']} from {threat['source_ip']}")
 
     def add_honeypot_hit(self, hit: dict):
         with self._lock:
             self.honeypot_hits.appendleft(hit)
+        json_audit.append_stream("events_honeypot_hits", {"kind": "honeypot_hit", **hit})
         self._broadcast("honeypot_hit", hit)
         self.log(f"[HONEYPOT] Hit from {hit['attacker_ip']} — ports {hit['ports_tried']}")
 
     def block_ip(self, ip: str, reason: str):
         with self._lock:
             self.blocked_ips.add(ip)
+        json_audit.append_stream("events_firewall", {"kind": "ip_blocked", "ip": ip, "reason": reason})
         self._broadcast("ip_blocked", {"ip": ip, "reason": reason})
         self.log(f"[FIREWALL] Blocked {ip} — {reason}")
 
@@ -54,13 +71,62 @@ class MemoryStore:
                 "current_task": task,
                 "last_update": time.time()
             }
+        json_audit.append_stream(
+            "agent_status",
+            {
+                "agent_id": agent_id,
+                "status": status,
+                "task": task,
+                "ts": time.time(),
+            },
+        )
         self._broadcast("agent_status", {"agent_id": agent_id, "status": status, "task": task})
 
     def log(self, message: str):
         entry = {"time": time.time(), "msg": message}
+        json_audit.route_log_line(message, dict(entry))
         with self._lock:
             self.system_log.appendleft(entry)
         self._broadcast("log", entry)
+
+    def notify_injection(self, stage: str, summary: str):
+        payload = {"stage": stage, "summary": summary, "kind": "injection_banner", "ts": time.time()}
+        json_audit.append_stream("injections", payload)
+        self._broadcast("injection_notice", payload)
+
+    def emit_pipeline_tick(
+        self,
+        session_id: str,
+        step_index: int,
+        node_key: str,
+        title: str,
+        subtitle: str,
+        *,
+        injected: bool = False,
+        extra: Optional[Dict[str, Any]] = None,
+    ):
+        payload = {
+            "session_id": session_id,
+            "step_index": step_index,
+            "node_key": node_key,
+            "title": title,
+            "subtitle": subtitle,
+            "injected": injected,
+            "ts": time.time(),
+            **(extra or {}),
+        }
+        json_audit.append_stream("pipeline_steps", payload)
+        self._broadcast("pipeline_step", payload)
+
+    def broadcast_pipeline_session_start(self, session_id: str, trigger_source: str):
+        json_audit.append_stream(
+            "pipeline_sessions",
+            {"kind": "session_start", "session_id": session_id, "trigger_source": trigger_source, "ts": time.time()},
+        )
+        self._broadcast(
+            "pipeline_session",
+            {"session_id": session_id, "trigger_source": trigger_source, "ts": time.time()},
+        )
 
     def get_all_devices(self) -> List[dict]:
         with self._lock:

@@ -3,6 +3,7 @@ import json, time, uuid
 from agents.base import BaseAgent
 from security.sanitiser import safe_llm_context
 from store.memory_store import store
+from orchestrator.staging import prepare_threat_detector
 from tools.web_search_tool import search_threat_intel
 from pydantic import BaseModel, field_validator
 
@@ -43,6 +44,7 @@ class ThreatDetectorAgent(BaseAgent):
     description = "Analysing threats with deep LLM reasoning"
 
     async def execute(self, state: dict) -> dict:
+        state = prepare_threat_detector(dict(state))
         devices = state.get("devices", [])
         high_risk = [d for d in devices if d.get("risk_level") in ("high", "critical")]
 

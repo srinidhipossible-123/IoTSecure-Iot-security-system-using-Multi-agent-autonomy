@@ -2,6 +2,7 @@
 import time, threading, uuid, secrets
 from agents.base import BaseAgent
 from store.memory_store import store
+from orchestrator.staging import prepare_deception
 from honeypot.server import HoneypotServer
 from honeypot.canary import CanaryTokens
 
@@ -15,6 +16,7 @@ class DeceptionAgent(BaseAgent):
         self.canary = CanaryTokens()
 
     async def execute(self, state: dict) -> dict:
+        state = prepare_deception(dict(state))
         threats = state.get("threats", [])
         honeypot_tasks = [
             t for t in threats

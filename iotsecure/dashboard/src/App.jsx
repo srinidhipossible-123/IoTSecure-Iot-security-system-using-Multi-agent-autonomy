@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Shield, Wifi, Monitor, ShieldAlert, Ghost, Crosshair,
-  Terminal, Menu, X, BarChart3, Layers, Lock, Clock
+  Shield, Monitor, ShieldAlert, Ghost, Crosshair,
+  Terminal, Menu, X, BarChart3, Layers, Lock,
+  Download, Trash2, RefreshCw, Eraser, CheckCircle2, AlertCircle, Loader2, Sparkles,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -13,20 +14,27 @@ import HoneypotLog from './components/HoneypotLog';
 import NetworkMap from './components/NetworkMap';
 import OrchestratorGraph from './components/OrchestratorGraph';
 import AttackSimulator from './components/AttackSimulator';
+import MissionControl from './components/MissionControl';
+import PipelineRail from './components/PipelineRail';
 import { useWebSocket } from './hooks/useWebSocket';
 
-/* ── Animated Number ── */
+const CyberBackdrop = lazy(() => import('./components/CyberBackdrop'));
+
+/* -- Animated Number -- */
 function AnimatedNumber({ value, className }) {
   const [display, setDisplay] = useState(0);
   const ref = useRef(null);
+  const displayRef = useRef(0);
   useEffect(() => {
-    const start = display;
+    const start = displayRef.current;
     const end = value;
     if (start === end) return;
     const startTime = Date.now();
     const tick = () => {
       const p = Math.min((Date.now() - startTime) / 600, 1);
-      setDisplay(Math.round(start + (end - start) * (1 - Math.pow(1 - p, 3))));
+      const next = Math.round(start + (end - start) * (1 - Math.pow(1 - p, 3)));
+      displayRef.current = next;
+      setDisplay(next);
       if (p < 1) ref.current = requestAnimationFrame(tick);
     };
     ref.current = requestAnimationFrame(tick);
@@ -35,8 +43,7 @@ function AnimatedNumber({ value, className }) {
   return <span className={className}>{display}</span>;
 }
 
-/* ── System Log ── */
-function SystemLog({ logs, filter }) {
+function SystemLog({ logs, filter, onClear }) {
   const ref = useRef(null);
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [logs]);
   const filtered = useMemo(() => {
@@ -44,45 +51,74 @@ function SystemLog({ logs, filter }) {
     return logs.filter(l => l.msg?.toLowerCase().includes(filter.toLowerCase()));
   }, [logs, filter]);
 
+  const downloadLogs = () => {
+    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `iotsecure-trace-${new Date().toISOString()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const colorize = (msg) => {
     if (!msg) return '';
-    if (msg.includes('[ERROR]') || msg.includes('[FAIL]')) return 'text-red-400';
-    if (msg.includes('[WARN]')) return 'text-amber-400';
-    if (msg.includes('[THREAT]')) return 'text-orange-400';
-    if (msg.includes('[HONEYPOT]')) return 'text-pink-400';
-    if (msg.includes('[A2A]')) return 'text-purple-400';
-    if (msg.includes('[TRACE]')) return 'text-cyan-400';
-    if (msg.includes('[FIREWALL]')) return 'text-red-300';
-    if (msg.includes('[DISCOVERY]')) return 'text-blue-400';
-    if (msg.includes('[PROFILER]')) return 'text-violet-400';
-    if (msg.includes('[RESPONSE]')) return 'text-emerald-400';
-    if (msg.includes('[DECEPTION]')) return 'text-pink-300';
-    if (msg.includes('[ORCHESTRATOR]')) return 'text-cyan-300';
-    if (msg.includes('[SYSTEM]')) return 'text-green-400';
+    const m = msg.toUpperCase();
+    if (m.includes('[STAGING]')) return 'text-fuchsia-400';
+    if (m.includes('[ERROR]') || m.includes('[FAIL]')) return 'text-red-400';
+    if (m.includes('[WARN]')) return 'text-amber-400';
+    if (m.includes('[THREAT]')) return 'text-orange-400';
+    if (m.includes('[HONEYPOT]')) return 'text-pink-400';
+    if (m.includes('[A2A]')) return 'text-purple-400';
+    if (m.includes('[TRACE]')) return 'text-cyan-400';
+    if (m.includes('[FIREWALL]')) return 'text-red-300';
+    if (m.includes('[DISCOVERY]')) return 'text-blue-400';
+    if (m.includes('[PROFILER]')) return 'text-violet-400';
+    if (m.includes('[RESPONSE]')) return 'text-emerald-400';
+    if (m.includes('[DECEPTION]')) return 'text-pink-300';
+    if (m.includes('[ORCHESTRATOR]')) return 'text-cyan-300';
+    if (m.includes('[SYSTEM]')) return 'text-green-400';
     return 'text-slate-500';
   };
 
   return (
-    <div ref={ref} className="terminal-log h-[220px] overflow-y-auto">
-      {filtered.length === 0 ? (
-        <div className="flex items-center justify-center h-full">
-          <span className="text-slate-600 text-xs">Waiting for events...</span>
+    <div className="glass-card flex flex-col h-full">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Terminal className="w-4 h-4 text-cyan-400" />
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider">System Log</h2>
         </div>
-      ) : (
-        filtered.slice(0, 100).map((log, i) => (
-          <div key={i} className={clsx('py-0.5', colorize(log.msg))}>
-            <span className="text-slate-700 mr-3 select-none">
-              {log.time ? new Date(log.time * 1000).toLocaleTimeString() : ''}
-            </span>
-            {log.msg}
+        <div className="flex items-center gap-2">
+          <button onClick={downloadLogs} title="Download Logs" className="p-1.5 rounded-md hover:bg-white/10 text-slate-500 hover:text-cyan-400 transition-colors">
+            <Download className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onClear} title="Clear Logs" className="p-1.5 rounded-md hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+      
+      <div ref={ref} className="terminal-log flex-1 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <span className="text-slate-600 text-[10px] uppercase font-bold tracking-widest">Awaiting Traces...</span>
           </div>
-        ))
-      )}
+        ) : (
+          filtered.slice(0, 100).map((log, i) => (
+            <div key={i} className={clsx('py-0.5 text-[11px] font-mono leading-relaxed', colorize(log.msg))}>
+              <span className="text-slate-700 mr-2 opacity-50">
+                {log.time ? new Date(log.time * 1000).toLocaleTimeString([], { hour12: false }) : ''}
+              </span>
+              {log.msg}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
-/* ── Tab Config ── */
+/* -- Tab Config -- */
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'devices', label: 'Devices', icon: Monitor },
@@ -92,18 +128,38 @@ const TABS = [
   { id: 'attack', label: 'Attack Sim', icon: Crosshair },
 ];
 
-/* ═════════════════════════════ MAIN APP ═════════════════════════════ */
+/* ========= MAIN APP ========= */
 export default function App() {
-  const { state, connected } = useWebSocket('ws://localhost:8000/ws');
+  const { state, connected, refreshing, refreshAll } = useWebSocket();
   const [activeTab, setActiveTab] = useState('overview');
   const [logFilter, setLogFilter] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [layoutKey, setLayoutKey] = useState(0);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+  const dashboardState = state;
+  const [lastCleared, setLastCleared] = useState(0);
 
-  const orchestratorStatus = state.agent_statuses?.orchestrator?.status || 'idle';
+  const showToast = (payload) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(payload);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3200);
+  };
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
+  // Filter logs locally if user clicked "Clear"
+  const localLogs = useMemo(() => {
+    return (dashboardState.system_log || []).filter(l => l.time > lastCleared);
+  }, [dashboardState.system_log, lastCleared]);
+
+  const orchestratorStatus = dashboardState.agent_statuses?.orchestrator?.status || 'idle';
 
   // Derive active pipeline phase from which agent is currently running
   const currentPhase = useMemo(() => {
-    const statuses = state.agent_statuses || {};
+    const statuses = dashboardState.agent_statuses || {};
     if (statuses.discovery?.status === 'running') return 'discover';
     if (statuses.profiler?.status === 'running') return 'profile';
     if (statuses.threat_detector?.status === 'running') return 'analyse';
@@ -111,19 +167,80 @@ export default function App() {
     if (statuses.response?.status === 'running') return 'respond';
     if (orchestratorStatus === 'running') return 'running';
     return 'idle';
-  }, [state.agent_statuses, orchestratorStatus]);
+  }, [dashboardState.agent_statuses, orchestratorStatus]);
+
+  const handleRefreshEverything = async () => {
+    try {
+      const ok = await refreshAll();
+      setLastCleared(0);
+      setLayoutKey((k) => k + 1);
+      if (ok) {
+        showToast({ type: 'ok', message: 'Live state synced — agents, devices, and logs updated.' });
+      } else {
+        showToast({
+          type: 'err',
+          message: 'API unreachable — reconnected live stream only. Start the backend on :8000.',
+        });
+      }
+    } catch (err) {
+      console.error('Refresh failed:', err);
+      showToast({ type: 'err', message: 'Could not refresh. Check the console for details.' });
+    }
+  };
+
+  const handleGlobalReset = async () => {
+    try {
+      const res = await fetch('/api/system/reset', { method: 'POST' });
+      setLastCleared(Date.now() / 1000);
+      await refreshAll();
+      setLayoutKey((k) => k + 1);
+      if (res.ok) {
+        showToast({ type: 'ok', message: 'System wiped — fresh defence surface from the backend.' });
+      } else {
+        showToast({ type: 'err', message: 'Reset rejected by the server. Check API logs.' });
+      }
+    } catch (err) {
+      console.error('Failed to reset system:', err);
+      showToast({ type: 'err', message: 'Reset request failed. Try again when the API is online.' });
+    }
+  };
 
   // Count pipeline iterations from log
   const iterationCount = useMemo(() => {
-    return (state.system_log || []).filter(l => l.msg?.includes('Pipeline complete')).length;
-  }, [state.system_log]);
+    return (dashboardState.system_log || []).filter(l => l.msg?.includes('Pipeline complete')).length;
+  }, [dashboardState.system_log]);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+    <div className="relative isolate min-h-screen flex flex-col overflow-x-hidden bg-[#030712] text-slate-100">
+      <Suspense fallback={null}>
+        <CyberBackdrop />
+      </Suspense>
 
-      {/* ══════════ HEADER ══════════ */}
-      <header className="sticky top-0 z-30">
-        <div className="flex items-center px-8 py-4 bg-[#080d1a]/90 backdrop-blur-2xl border-b border-white/[0.04]">
+      <div className="relative z-10 flex min-h-screen flex-1 flex-col">
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.22 }}
+            className="fixed top-[4.25rem] left-1/2 z-[100] -translate-x-1/2 px-5 py-3 rounded-2xl border border-white/[0.08] bg-[#0c1324]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.45)] flex items-center gap-3 max-w-[min(420px,calc(100vw-2rem))]"
+          >
+            {toast.type === 'ok' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+            )}
+            <p className="text-[12px] text-slate-200 leading-snug font-medium">{toast.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── HEADER ── */}
+      <header className="sticky top-0 z-40 backdrop-blur-2xl">
+        <div className="flex items-center gap-4 px-5 sm:px-8 py-3.5 sm:py-4 border-b border-cyan-500/10 shadow-[0_12px_40px_rgba(0,0,0,0.45)] bg-gradient-to-r from-[#050a14]/94 via-[#070f1e]/92 to-[#050a14]/94">
 
           {/* Mobile toggle */}
           <button onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -133,11 +250,11 @@ export default function App() {
 
           {/* Brand */}
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/15 flex items-center justify-center shadow-lg shadow-cyan-500/5">
+            <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-cyan-400/25 to-blue-600/25 border border-cyan-400/25 flex items-center justify-center shadow-[0_0_28px_rgba(34,211,238,0.18)] ring-1 ring-white/10">
               <Shield className="w-5 h-5 text-cyan-400" />
             </div>
             <div className="leading-tight">
-              <h1 className="text-[17px] font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+              <h1 className="font-[Outfit,Inter,sans-serif] text-[18px] sm:text-[19px] font-extrabold bg-gradient-to-r from-cyan-300 via-sky-400 to-violet-400 bg-clip-text text-transparent tracking-tight">
                 IoTSecure
               </h1>
               <span className="text-[9px] text-slate-600 font-semibold tracking-[0.15em] uppercase">Agentic AI Defence</span>
@@ -157,28 +274,61 @@ export default function App() {
             </span>
           </div>
 
-          {/* Stats — right */}
-          <div className="ml-auto flex items-center gap-3.5">
-            {[
-              { label: 'Devices', val: state.stats.total_devices, color: 'text-cyan-400' },
-              { label: 'Threats', val: state.stats.threats_detected, color: 'text-amber-400' },
-              { label: 'Blocked', val: state.stats.blocked_ips, color: 'text-red-400' },
-              { label: 'Honeypot', val: state.stats.honeypot_hits, color: 'text-pink-400' },
-            ].map(s => (
-              <div key={s.label} className="stat-card hidden sm:flex flex-col items-center">
-                <AnimatedNumber value={s.val} className={clsx('text-[22px] font-bold leading-none', s.color)} />
-                <span className="text-[8px] text-slate-500 uppercase tracking-[0.12em] font-semibold mt-1.5">{s.label}</span>
-              </div>
-            ))}
+          {/* Stats & Actions — right (refresh is rightmost) */}
+          <div className="ml-auto flex items-center gap-3 sm:gap-5 flex-wrap justify-end">
+            <div className="flex items-center gap-2 sm:gap-3.5">
+              {[
+                { label: 'Devices', val: dashboardState.stats.total_devices, color: 'text-cyan-400' },
+                { label: 'Threats', val: dashboardState.stats.threats_detected, color: 'text-amber-400' },
+                { label: 'Blocked', val: dashboardState.stats.blocked_ips, color: 'text-red-400' },
+                { label: 'Honeypot', val: dashboardState.stats.honeypot_hits, color: 'text-pink-400' },
+              ].map(s => (
+                <div key={s.label} className="stat-card hidden sm:flex flex-col items-center min-w-[4.5rem]">
+                  <AnimatedNumber value={s.val} className={clsx('text-[22px] font-bold leading-none tabular-nums', s.color)} />
+                  <span className="text-[8px] text-slate-500 uppercase tracking-[0.12em] font-semibold mt-1.5">{s.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="w-px h-8 bg-white/[0.06] hidden md:block" aria-hidden />
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleGlobalReset}
+                title="Wipe in-memory state on the server (destructive)"
+                className="ux-btn flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-red-500/[0.08] hover:border-red-500/25 transition-all text-slate-400 hover:text-red-300 group"
+              >
+                <Eraser className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Hard reset</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRefreshEverything}
+                disabled={refreshing}
+                title="Reconnect stream and pull the latest snapshot from the API"
+                className="ux-btn flex items-center gap-2 pl-3.5 pr-4 sm:pl-4 sm:pr-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-600/15 border border-cyan-500/25 hover:border-cyan-400/45 hover:shadow-[0_0_24px_rgba(6,182,212,0.12)] transition-all text-cyan-100 disabled:opacity-60 disabled:pointer-events-none ring-1 ring-white/[0.04]"
+              >
+                {refreshing ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-cyan-300" aria-hidden />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-cyan-300" aria-hidden />
+                )}
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-50/95">
+                  {refreshing ? 'Syncing…' : 'Refresh all'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
         <div className="header-glow h-px" />
       </header>
 
-      {/* ══════════ BODY ══════════ */}
+      {/* === BODY === */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── SIDEBAR ── */}
+        {/* -- SIDEBAR -- */}
         <AnimatePresence>
           {sidebarOpen && (
             <motion.aside
@@ -186,7 +336,7 @@ export default function App() {
               animate={{ width: 240, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex flex-col overflow-hidden flex-shrink-0 border-r border-white/[0.04] bg-[#080d1a]/40"
+              className="flex flex-col overflow-hidden flex-shrink-0 border-r border-white/[0.07] bg-slate-950/45 backdrop-blur-2xl"
             >
               {/* Nav label */}
               <div className="px-6 pt-7 pb-3">
@@ -207,11 +357,11 @@ export default function App() {
                       <Icon className={clsx('w-[18px] h-[18px] flex-shrink-0',
                         isActive ? 'text-cyan-400' : 'text-slate-500')} />
                       <span className="flex-1">{tab.label}</span>
-                      {tab.id === 'threats' && state.stats.threats_detected > 0 && (
-                        <span className="badge bg-amber-500/15 text-amber-400 text-[9px]">{state.stats.threats_detected}</span>
+                      {tab.id === 'threats' && dashboardState.stats.threats_detected > 0 && (
+                        <span className="badge bg-amber-500/15 text-amber-400 text-[9px]">{dashboardState.stats.threats_detected}</span>
                       )}
-                      {tab.id === 'honeypot' && state.stats.honeypot_hits > 0 && (
-                        <span className="badge bg-pink-500/15 text-pink-400 text-[9px] animate-pulse-glow">{state.stats.honeypot_hits}</span>
+                      {tab.id === 'honeypot' && dashboardState.stats.honeypot_hits > 0 && (
+                        <span className="badge bg-pink-500/15 text-pink-400 text-[9px] animate-pulse-glow">{dashboardState.stats.honeypot_hits}</span>
                       )}
                     </button>
                   );
@@ -239,19 +389,37 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* ── MAIN CONTENT ── */}
+        {/* -- MAIN CONTENT -- */}
         <main className="flex-1 overflow-y-auto">
-          <div className="p-8 max-w-[1600px] mx-auto space-y-7">
+          <div className="p-6 sm:p-8 max-w-[1680px] mx-auto space-y-7">
 
-            {/* Agent Pipeline — always on top */}
-            <section>
-              <AgentStatusPanel agentStatuses={state.agent_statuses} orchestratorStatus={orchestratorStatus} />
-            </section>
+            <PipelineRail steps={dashboardState.pipelineSteps} agentStatuses={dashboardState.agent_statuses} />
+
+            <AnimatePresence>
+              {dashboardState.lastInjectionNotice && (
+                <motion.div
+                  key={String(dashboardState.lastInjectionNotice.ts ?? dashboardState.lastInjectionNotice.summary)}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.28 }}
+                  className="rounded-2xl border border-fuchsia-500/25 bg-gradient-to-r from-fuchsia-500/10 via-violet-600/5 to-transparent px-5 py-3.5 flex items-start gap-3"
+                >
+                  <Sparkles className="w-5 h-5 text-fuchsia-300 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-fuchsia-300/80 mb-1">
+                      Stage narration · {(dashboardState.lastInjectionNotice.stage || 'signal').replace(/_/g, ' ')}
+                    </p>
+                    <p className="text-[12px] text-slate-200 leading-snug">{dashboardState.lastInjectionNotice.summary}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Tab content with smooth transition */}
             <AnimatePresence mode="wait">
               <motion.section
-                key={activeTab}
+                key={`${activeTab}-${layoutKey}`}
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
@@ -259,56 +427,53 @@ export default function App() {
               >
                 {activeTab === 'overview' && (
                   <div className="space-y-7">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
-                      <OrchestratorGraph agentStatuses={state.agent_statuses} currentPhase={currentPhase} iteration={iterationCount} />
-                      <ThreatFeed threats={state.threats} />
+                    <AgentStatusPanel agentStatuses={dashboardState.agent_statuses} orchestratorStatus={orchestratorStatus} />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-7">
+                      <div className="lg:col-span-2">
+                        <OrchestratorGraph agentStatuses={dashboardState.agent_statuses} currentPhase={currentPhase} iteration={iterationCount} />
+                      </div>
+                      <MissionControl />
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
-                      <DeviceRiskCards devices={state.devices} />
-                      <HoneypotLog hits={state.honeypot_hits} />
+                      <ThreatFeed threats={dashboardState.threats} />
+                      <DeviceRiskCards devices={dashboardState.devices} />
                     </div>
                   </div>
                 )}
 
                 {activeTab === 'devices' && (
                   <div className="space-y-7">
-                    <DeviceRiskCards devices={state.devices} />
-                    <NetworkMap devices={state.devices} />
+                    <DeviceRiskCards devices={dashboardState.devices} />
+                    <NetworkMap devices={dashboardState.devices} />
                   </div>
                 )}
 
-                {activeTab === 'threats' && <ThreatFeed threats={state.threats} />}
-                {activeTab === 'honeypot' && <HoneypotLog hits={state.honeypot_hits} />}
-                {activeTab === 'network' && <NetworkMap devices={state.devices} />}
+                {activeTab === 'threats' && <ThreatFeed threats={dashboardState.threats} />}
+                {activeTab === 'honeypot' && (
+                  <HoneypotLog hits={dashboardState.honeypot_hits} systemLog={dashboardState.system_log} />
+                )}
+                {activeTab === 'network' && <NetworkMap devices={dashboardState.devices} />}
 
                 {activeTab === 'attack' && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
                     <AttackSimulator />
-                    <OrchestratorGraph agentStatuses={state.agent_statuses} currentPhase={orchestratorStatus} iteration={0} />
+                    <OrchestratorGraph agentStatuses={dashboardState.agent_statuses} currentPhase={orchestratorStatus} iteration={0} />
                   </div>
                 )}
               </motion.section>
             </AnimatePresence>
 
             {/* System Log — always at bottom */}
-            <section className="glass-card">
-              <div className="flex items-center gap-3.5 mb-5">
-                <div className="w-9 h-9 rounded-[12px] bg-emerald-500/10 border border-emerald-500/12 flex items-center justify-center">
-                  <Terminal className="w-[18px] h-[18px] text-emerald-400" />
-                </div>
-                <div>
-                  <h2 className="section-title">System Log</h2>
-                  <span className="section-subtitle">Live terminal feed · color-coded by agent</span>
-                </div>
-                <div className="ml-auto flex items-center gap-2.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
-                  <span className="text-[10px] text-slate-500 font-medium">{state.system_log.length} events</span>
-                </div>
-              </div>
-              <SystemLog logs={state.system_log} filter={logFilter} />
+            <section className="h-[300px]">
+              <SystemLog 
+                logs={localLogs} 
+                filter={logFilter} 
+                onClear={() => setLastCleared(Date.now() / 1000)}
+              />
             </section>
           </div>
         </main>
+      </div>
       </div>
     </div>
   );

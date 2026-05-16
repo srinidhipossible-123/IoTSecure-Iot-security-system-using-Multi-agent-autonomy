@@ -1,6 +1,0 @@
-2026-05-15 21:56:48 | BLOCK_IP | 198.51.100.23 | Port scanning activity | dry_run=True | rule=iptables -A INPUT -s 198.51.100.23 -j DROP
-2026-05-15 22:05:17 | BLOCK_IP | 203.0.113.42 | credential theft attempt | dry_run=True | rule=iptables -A INPUT -s 203.0.113.42 -j DROP
-2026-05-15 22:06:43 | BLOCK_IP | 198.51.100.23 | Port scan attempt | dry_run=True | rule=iptables -A INPUT -s 198.51.100.23 -j DROP
-2026-05-15 22:07:20 | BLOCK_IP | 192.0.2.100 | brute-force attempt | dry_run=True | rule=iptables -A INPUT -s 192.0.2.100 -j DROP
-2026-05-15 22:08:05 | BLOCK_IP | 192.168.1.99 | Lateral movement attempt | dry_run=True | rule=iptables -A INPUT -s 192.168.1.99 -j DROP
-2026-05-15 22:18:21 | BLOCK_IP | 198.51.100.23 | Port scan attempt | dry_run=True | rule=iptables -A INPUT -s 198.51.100.23 -j DROP

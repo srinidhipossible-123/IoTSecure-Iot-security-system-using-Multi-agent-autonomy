@@ -55,7 +55,9 @@ class DiscoveryAgent(BaseAgent):
     }
 
     async def execute(self, state: dict) -> dict:
-        subnet = state.get("subnet", "192.168.1.0/24")
+        # Always re-detect or use current config subnet
+        from config import _detect_subnet
+        subnet = _detect_subnet()
         my_ip = self._get_my_ip()
 
         store.log(f"[DISCOVERY] Scanning {subnet} (my IP: {my_ip})")
@@ -96,33 +98,53 @@ class DiscoveryAgent(BaseAgent):
 
     def _ping_sweep(self, subnet: str):
         """Parallel ping sweep using Windows — populates ARP table with all live devices."""
+        procs: list = []
         try:
             network = ipaddress.IPv4Network(subnet, strict=False)
             # Build a batch of ping commands — run all at once
-            # Use subprocess with /C to run multiple pings in parallel
             hosts = [str(ip) for ip in network.hosts()]
 
-            # Batch ping: fire all at once using Start-Process (non-blocking)
             batch_size = 50
             for i in range(0, len(hosts), batch_size):
-                batch = hosts[i:i+batch_size]
-                # Use cmd /C to fire pings in background
+                batch = hosts[i : i + batch_size]
                 for ip in batch:
-                    subprocess.Popen(
+                    p = subprocess.Popen(
                         ["ping", "-n", "1", "-w", "200", ip],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
-                        creationflags=0x08000000  # CREATE_NO_WINDOW
+                        creationflags=0x08000000,  # CREATE_NO_WINDOW
                     )
-                # Small pause between batches to avoid overwhelming
+                    procs.append(p)
                 time.sleep(0.1)
 
             # Wait for pings to complete and ARP table to populate
             time.sleep(4)
             store.log("[DISCOVERY] Ping sweep complete")
 
+            for p in procs:
+                if p.poll() is None:
+                    try:
+                        p.terminate()
+                    except Exception:
+                        pass
+            for p in procs:
+                try:
+                    p.wait(timeout=8)
+                except Exception:
+                    try:
+                        p.kill()
+                    except Exception:
+                        pass
+            procs.clear()
+
         except Exception as e:
             store.log(f"[DISCOVERY][WARN] Ping sweep error: {e}")
+            for p in procs:
+                try:
+                    if p.poll() is None:
+                        p.kill()
+                except Exception:
+                    pass
 
     def _read_arp(self, subnet: str, my_ip: str) -> list:
         """Read Windows ARP table — filtered to our subnet."""

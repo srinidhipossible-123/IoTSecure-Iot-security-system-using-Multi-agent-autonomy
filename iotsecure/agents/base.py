@@ -106,5 +106,17 @@ class BaseAgent(ABC):
         """Call Groq LLM with injection-safe prompting."""
         from langchain_core.messages import SystemMessage, HumanMessage
         messages = [SystemMessage(content=system), HumanMessage(content=user)]
-        response = self.llm.invoke(messages)
-        return response.content
+        try:
+            response = self.llm.invoke(messages)
+            return response.content
+        except Exception as exc:
+            logger.warning("LLM call failed for %s: %s", self.agent_id, exc)
+            store.log(
+                f"[{self.agent_id.upper()}][WARN] LLM unavailable — using synthetic analyst JSON for trace continuity"
+            )
+            return (
+                '{"threat_level":"high","confidence":0.72,"threat_type":"anomaly",'
+                '"reasoning":"Synthetic analyst output while the LLM control plane is unavailable '
+                '(offline key, quota, or network). Operator trace continues for demo.",'
+                '"recommended_action":"honeypot"}'
+            )

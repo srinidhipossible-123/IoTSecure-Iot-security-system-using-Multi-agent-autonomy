@@ -10,7 +10,8 @@ import logging
 import json
 import time
 import sys
-from concurrent.futures import ThreadPoolExecutor
+import copy
+import uuid
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +27,14 @@ console = Console()
 from orchestrator.graph import build_graph
 from webhook.receiver import app as webhook_app, set_orchestrator_trigger
 from store.memory_store import store
-from config import DASHBOARD_API_PORT, HOTSPOT_SUBNET, SCAN_INTERVAL_SECONDS
+from store import json_audit
+from config import (
+    DASHBOARD_API_PORT,
+    HOTSPOT_SUBNET,
+    SCAN_INTERVAL_SECONDS,
+    PIPELINE_STEP_DELAY_SEC,
+    AUTONOMOUS_PIPELINE_MODE,
+)
 
 # Reuse webhook FastAPI app
 app = webhook_app
@@ -113,6 +121,10 @@ def get_stats():
         "active_honeypots": len(store.active_honeypots),
     }
 
+@app.get("/api/blocked-ips")
+def get_blocked_ips():
+    return list(store.blocked_ips)
+
 @app.get("/api/agent-statuses")
 def get_agent_statuses():
     return dict(store.agent_statuses)
@@ -136,56 +148,133 @@ initial_state = {
     "dashboard_events": [], "system_log": []
 }
 
+
+NODE_LABELS = {
+    "discovery": ("Subnet cartography", "ARP intelligence · awake sweep"),
+    "profiler": ("Host intelligence", "CVE fusion · risk posture"),
+    "threat_detector": ("Threat cognition", "LLM analysis · correlators"),
+    "deception": ("Deception lattice", "Honeyports · canary lattice"),
+    "response": ("Enforcement spine", "Mitigation choreography"),
+}
+
+
+async def invoke_staged_pipeline(seed: dict) -> dict:
+    """Run agents step-by-step with pauses between LangGraph emissions for narration."""
+    session_id = uuid.uuid4().hex[:12]
+    store.broadcast_pipeline_session_start(session_id, seed.get("trigger_source") or "scheduled")
+
+    accumulated = copy.deepcopy(seed)
+    store.set_agent_status("orchestrator", "running", f"Sequential trace × {session_id}")
+    step_ix = 0
+
+    async def consume_stream():
+        nonlocal accumulated, step_ix
+        async for chunk in graph.astream(accumulated, stream_mode="updates"):
+            for node_key, delta in (chunk or {}).items():
+                if isinstance(delta, dict):
+                    accumulated.update(delta)
+                title, subtitle = NODE_LABELS.get(
+                    node_key, (node_key.replace("_", " ").title(), "Agent execution beat")
+                )
+                store.emit_pipeline_tick(session_id, step_ix, node_key, title, subtitle)
+                step_ix += 1
+                await asyncio.sleep(PIPELINE_STEP_DELAY_SEC)
+
+    try:
+        await consume_stream()
+    except Exception as exc:
+        store.log(f"[ORCHESTRATOR][ERROR] {exc}")
+        store.set_agent_status("orchestrator", "idle")
+        raise
+
+    devs = accumulated.get("devices") or []
+    store.log(f"[ORCHESTRATOR] Pipeline complete — found {len(devs)} hosts (session {session_id})")
+    json_audit.append_stream(
+        "pipeline_sessions",
+        {
+            "kind": "pipeline_session_end",
+            "session_id": session_id,
+            "steps": step_ix,
+            "device_count": len(devs),
+            "trigger_source": seed.get("trigger_source") or "scheduled",
+            "ts": time.time(),
+        },
+    )
+
+    store.set_agent_status("orchestrator", "idle")
+    return accumulated
+
+
 def _pipeline_thread_fn():
     """Run pipeline loop in a separate thread with its own event loop.
     This keeps the main asyncio loop (FastAPI/WebSocket) fully responsive
     while nmap and other blocking I/O agents run independently."""
-    import threading
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    async def _cycle():
-        state = initial_state.copy()
-        store.log("[ORCHESTRATOR] Pipeline started")
-        store.set_agent_status("orchestrator", "running", "Executing pipeline")
+    async def _cycle_once():
+        snapshot = copy.deepcopy(initial_state)
         try:
-            result = await graph.ainvoke(state)
-            store.log(f"[ORCHESTRATOR] Pipeline complete — found {len(result.get('devices', []))} devices")
+            await invoke_staged_pipeline(snapshot)
         except Exception as e:
-            store.log(f"[ORCHESTRATOR][ERROR] {e}")
-        store.set_agent_status("orchestrator", "idle")
+            store.log(f"[SYSTEM][ERROR] Staged pipeline error: {e}")
 
-    async def _loop():
+    async def _loop_forever():
         await asyncio.sleep(3)
-        store.log("[SYSTEM] IoTSecure autonomous pipeline started")
+        if AUTONOMOUS_PIPELINE_MODE == "manual":
+            store.log(
+                "[SYSTEM] Autonomous loop paused (AUTONOMOUS_PIPELINE_MODE=manual). "
+                "Run one cycle: POST /api/pipeline/run or POST /webhook/trigger"
+            )
+            await asyncio.Future()  # park forever until process exit
+            return
+        if AUTONOMOUS_PIPELINE_MODE == "once":
+            store.log("[SYSTEM] IoTSecure — single autonomous run (AUTONOMOUS_PIPELINE_MODE=once)")
+            await _cycle_once()
+            store.log("[ORCHESTRATOR] Scheduled scan disabled after first run — use manual trigger for repeat")
+            await asyncio.Future()
+            return
+        store.log(
+            f"[SYSTEM] IoTSecure autonomous pipeline started "
+            f"(interval {SCAN_INTERVAL_SECONDS}s — set SCAN_INTERVAL_SECONDS or AUTONOMOUS_PIPELINE_MODE to change)"
+        )
         while True:
-            try:
-                await _cycle()
-            except Exception as e:
-                store.log(f"[SYSTEM][ERROR] Pipeline error: {e}")
+            await _cycle_once()
             store.log(f"[ORCHESTRATOR] Next scan in {SCAN_INTERVAL_SECONDS}s...")
             await asyncio.sleep(SCAN_INTERVAL_SECONDS)
 
-    loop.run_until_complete(_loop())
+    loop.run_until_complete(_loop_forever())
+
 
 async def run_pipeline_webhook(trigger_data: dict = None):
     """Webhook-triggered pipeline run (fires in pipeline thread)."""
     import threading
+    trig = "webhook"
+    if trigger_data:
+        if trigger_data.get("trigger_source"):
+            trig = str(trigger_data["trigger_source"])
+        elif trigger_data.get("event") == "api_manual_trigger":
+            trig = "manual_api"
+
     def _run():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        state = initial_state.copy()
-        state["trigger_source"] = "webhook"
-        store.log("[ORCHESTRATOR] Webhook-triggered pipeline started")
-        store.set_agent_status("orchestrator", "running", "Webhook trigger")
+        subloop = asyncio.new_event_loop()
+        asyncio.set_event_loop(subloop)
+        state = copy.deepcopy(initial_state)
+        state["trigger_source"] = trig
+        store.log("[ORCHESTRATOR] Pipeline run scheduled")
         try:
-            result = loop.run_until_complete(graph.ainvoke(state))
-            store.log(f"[ORCHESTRATOR] Pipeline complete — found {len(result.get('devices', []))} devices")
+            subloop.run_until_complete(invoke_staged_pipeline(state))
         except Exception as e:
             store.log(f"[ORCHESTRATOR][ERROR] {e}")
-        store.set_agent_status("orchestrator", "idle")
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@app.post("/api/pipeline/run")
+async def api_run_pipeline_now():
+    """Run one discovery → response cycle on demand (no continuous loop needed)."""
+    await run_pipeline_webhook({"event": "api_manual_trigger"})
+    return {"status": "accepted", "message": "Pipeline scheduled in background"}
 
 set_orchestrator_trigger(run_pipeline_webhook)
 
@@ -203,6 +292,17 @@ async def main():
     console.print(f"[green]Dashboard API: http://localhost:{DASHBOARD_API_PORT}[/]")
     console.print(f"[green]WebSocket:     ws://localhost:{DASHBOARD_API_PORT}/ws[/]")
     console.print(f"[green]Webhook:       http://localhost:{DASHBOARD_API_PORT}/webhook/trigger[/]")
+    console.print("[green]Structured logs: logs/audit/*.jsonl[/]")
+    if AUTONOMOUS_PIPELINE_MODE == "loop":
+        console.print(
+            f"[cyan]Autonomous scans[/]: every [bold]{SCAN_INTERVAL_SECONDS}s[/] · "
+            f"set SCAN_INTERVAL_SECONDS or AUTONOMOUS_PIPELINE_MODE=manual|once in .env"
+        )
+    else:
+        console.print(
+            f"[cyan]Autonomous scans[/]: [bold]{AUTONOMOUS_PIPELINE_MODE}[/] — trigger manually: "
+            "[bold]POST /api/pipeline/run[/]"
+        )
     console.print("[yellow]Run 'npm run dev' in /dashboard to start the React UI[/]")
 
     store.log("[SYSTEM] IoTSecure starting up...")
